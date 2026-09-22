@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Employee Management - RPA Demo</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 12px 20px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        #status {
+            margin-top: 20px;
+            padding: 12px;
+            background: #f0f0f0;
+            min-height: 20px;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background: #f5f5f5;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Employee Management</h1>
+
+    <label for="name">Name</label>
+    <input
+        type="text"
+        id="name"
+        placeholder="Enter employee name"
+    >
+
+    <label for="department">Department</label>
+    <select id="department">
+        <option value="">Select department</option>
+        <option value="Finance">Finance</option>
+        <option value="HR">HR</option>
+        <option value="Engineering">Engineering</option>
+        <option value="Sales">Sales</option>
+    </select>
+
+    <label for="location">Location</label>
+    <input
+        type="text"
+        id="location"
+        placeholder="Enter location"
+    >
+
+    <label for="email">Email</label>
+    <input
+        type="email"
+        id="email"
+        placeholder="Enter email"
+    >
+
+    <button id="addEmployee">
+        Add Employee
+    </button>
+
+    <div id="status"></div>
+
+    <h2>Employees</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Location</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+
+        <tbody id="employees">
+        </tbody>
+    </table>
+
+</div>
+
+<script>
+
+document
+    .getElementById("addEmployee")
+    .addEventListener("click", function() {
+
+        const name =
+            document.getElementById("name").value.trim();
+
+        const department =
+            document.getElementById("department").value;
+
+        const location =
+            document.getElementById("location").value.trim();
+
+        const email =
+            document.getElementById("email").value.trim();
+
+        const status =
+            document.getElementById("status");
+
+        // Basic validation
+        if (!name || !department || !location || !email) {
+
+            status.textContent =
+                "Error: all fields are required.";
+
+            return;
+        }
+
+        // Create new table row
+        const row =
+            document.createElement("tr");
+
+        const values = [
+            name,
+            department,
+            location,
+            email
+        ];
+
+        values.forEach(function(value) {
+
+            const cell =
+                document.createElement("td");
+
+            cell.textContent = value;
+
+            row.appendChild(cell);
+        });
+
+        document
+            .getElementById("employees")
+            .appendChild(row);
+
+        // Display success
+        status.textContent =
+            "Employee " + name +
+            " added successfully.";
+
+        // Clear form
+        document.getElementById("name").value = "";
+
+        document.getElementById("department").value = "";
+
+        document.getElementById("location").value = "";
+
+        document.getElementById("email").value = "";
+    });
+
+</script>
+
+</body>
+</html>
