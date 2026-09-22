@@ -1,111 +1,397 @@
 import csv
 import time
 from pathlib import Path
+
 from playwright.sync_api import sync_playwright
 
+from validator import validate_employee
+from audit_logger import log_event
+
+
+# =========================================================
+# PROJECT PATHS
+# =========================================================
 
 ROOT = Path(__file__).resolve().parent.parent
+
 DATA_FILE = ROOT / "data" / "employees.csv"
 APP_FILE = ROOT / "app" / "employee_app.html"
 
 
+# =========================================================
+# CONFIGURATION
+# =========================================================
+
+# Delay between actions so we can visually observe the bot
+ACTION_DELAY = 1
+
+# Playwright delay between browser actions
+BROWSER_SLOW_MO = 300
+
+
+# =========================================================
+# LOAD EMPLOYEE DATA
+# =========================================================
+
 def load_employees():
-    with open(DATA_FILE, newline="", encoding="utf-8") as file:
+
+    with open(
+        DATA_FILE,
+        newline="",
+        encoding="utf-8"
+    ) as file:
+
         return list(csv.DictReader(file))
 
 
-def human_pause(seconds=1):
+# =========================================================
+# HUMAN-LIKE PAUSE
+# =========================================================
+
+def human_pause(seconds=ACTION_DELAY):
+
     time.sleep(seconds)
 
+
+# =========================================================
+# MAIN RPA WORKFLOW
+# =========================================================
 
 def run_bot():
 
     employees = load_employees()
 
-    print(f"Loaded {len(employees)} employees")
+    print("=" * 60)
+    print("RPA EMPLOYEE DATA ENTRY BOT")
+    print("=" * 60)
+
+    print(f"Loaded {len(employees)} employee records")
+
+    # Counters
+    successful = 0
+    business_exceptions = 0
+    system_exceptions = 0
+
+    # -----------------------------------------------------
+    # START BROWSER
+    # -----------------------------------------------------
 
     with sync_playwright() as p:
 
         browser = p.chromium.launch(
             headless=False,
-            slow_mo=300
+            slow_mo=BROWSER_SLOW_MO
         )
 
         page = browser.new_page()
 
-        print("Opening employee application...")
-        page.goto(APP_FILE.as_uri())
+        try:
 
-        human_pause(2)
+            # =================================================
+            # OPEN APPLICATION
+            # =================================================
 
-        for employee in employees:
+            print("\nOpening Employee Management application...")
 
-            print(f"\nProcessing {employee['Name']}")
-
-            # HUMAN ACTION 1
-            print("→ Looking for Name field")
-            page.locator("#name").click()
-            human_pause(1)
-
-            # HUMAN ACTION 2
-            print(f"→ Typing name: {employee['Name']}")
-            page.locator("#name").fill(employee["Name"])
-            human_pause(1)
-
-            # HUMAN ACTION 3
-            print("→ Selecting department")
-            page.locator("#department").click()
-            human_pause(0.5)
-
-            page.locator("#department").select_option(
-                label=employee["Department"]
+            page.goto(
+                APP_FILE.as_uri(),
+                wait_until="domcontentloaded"
             )
-            human_pause(1)
-
-            # HUMAN ACTION 4
-            print(f"→ Typing location: {employee['Location']}")
-            page.locator("#location").click()
-            page.locator("#location").fill(employee["Location"])
-            human_pause(1)
-
-            # HUMAN ACTION 5
-            print(f"→ Typing email: {employee['Email']}")
-            page.locator("#email").click()
-            page.locator("#email").fill(employee["Email"])
-            human_pause(1)
-
-            # HUMAN ACTION 6
-            print("→ Clicking Add Employee")
-            page.locator("#addEmployee").click()
 
             human_pause(2)
 
-            # VERIFY
-            status = page.locator("#status").inner_text()
+            print("Application opened successfully.")
 
-            print(f"→ Application response: {status}")
+            # =================================================
+            # PROCESS EACH EMPLOYEE
+            # =================================================
 
-            expected = (
-                f"Employee {employee['Name']} added successfully."
-            )
+            for employee in employees:
 
-            if status != expected:
-                raise RuntimeError(
-                    f"Unexpected application response: {status}"
+                name = employee.get(
+                    "Name",
+                    ""
+                ).strip()
+
+                print("\n" + "-" * 60)
+                print(f"Processing: {name}")
+                print("-" * 60)
+
+                # =================================================
+                # STEP 1 — BUSINESS VALIDATION
+                # =================================================
+
+                errors = validate_employee(
+                    employee
                 )
 
-            print(f"✓ {employee['Name']} successfully processed")
+                if errors:
 
-            human_pause(2)
+                    business_exceptions += 1
 
-        print("\n================================")
-        print("RPA PROCESS COMPLETED")
-        print("================================")
+                    details = "; ".join(errors)
 
-        input("\nPress ENTER to close the browser...")
+                    print(
+                        "❌ BUSINESS EXCEPTION"
+                    )
 
-        browser.close()
+                    print(
+                        f"Employee: {name}"
+                    )
 
+                    for error in errors:
+
+                        print(
+                            f"   - {error}"
+                        )
+
+                    # Write exception to audit log
+                    log_event(
+                        employee=name,
+                        status="BUSINESS_EXCEPTION",
+                        details=details
+                    )
+
+                    print(
+                        "Skipping this employee."
+                    )
+
+                    continue
+
+                # =================================================
+                # STEP 2 — UI AUTOMATION
+                # =================================================
+
+                try:
+
+                    # -------------------------------------------------
+                    # NAME
+                    # -------------------------------------------------
+
+                    print(
+                        "→ Clicking Name field"
+                    )
+
+                    page.locator(
+                        "#name"
+                    ).click()
+
+                    human_pause()
+
+                    print(
+                        f"→ Entering Name: "
+                        f"{employee['Name']}"
+                    )
+
+                    page.locator(
+                        "#name"
+                    ).fill(
+                        employee["Name"]
+                    )
+
+                    human_pause()
+
+                    # -------------------------------------------------
+                    # DEPARTMENT
+                    # -------------------------------------------------
+
+                    print(
+                        "→ Selecting Department"
+                    )
+
+                    page.locator(
+                        "#department"
+                    ).click()
+
+                    human_pause(0.5)
+
+                    page.locator(
+                        "#department"
+                    ).select_option(
+                        label=employee["Department"]
+                    )
+
+                    human_pause()
+
+                    # -------------------------------------------------
+                    # LOCATION
+                    # -------------------------------------------------
+
+                    print(
+                        f"→ Entering Location: "
+                        f"{employee['Location']}"
+                    )
+
+                    page.locator(
+                        "#location"
+                    ).click()
+
+                    human_pause(0.5)
+
+                    page.locator(
+                        "#location"
+                    ).fill(
+                        employee["Location"]
+                    )
+
+                    human_pause()
+
+                    # -------------------------------------------------
+                    # EMAIL
+                    # -------------------------------------------------
+
+                    print(
+                        f"→ Entering Email: "
+                        f"{employee['Email']}"
+                    )
+
+                    page.locator(
+                        "#email"
+                    ).click()
+
+                    human_pause(0.5)
+
+                    page.locator(
+                        "#email"
+                    ).fill(
+                        employee["Email"]
+                    )
+
+                    human_pause()
+
+                    # =================================================
+                    # STEP 3 — SUBMIT
+                    # =================================================
+
+                    print(
+                        "→ Clicking Add Employee"
+                    )
+
+                    page.locator(
+                        "#addEmployee"
+                    ).click()
+
+                    human_pause(2)
+
+                    # =================================================
+                    # STEP 4 — VERIFY RESULT
+                    # =================================================
+
+                    status = page.locator(
+                        "#status"
+                    ).inner_text()
+
+                    print(
+                        f"→ Application response: "
+                        f"{status}"
+                    )
+
+                    expected = (
+                        f"Employee "
+                        f"{employee['Name']} "
+                        f"added successfully."
+                    )
+
+                    if status != expected:
+
+                        raise RuntimeError(
+                            "Unexpected application "
+                            f"response: {status}"
+                        )
+
+                    # =================================================
+                    # STEP 5 — SUCCESS
+                    # =================================================
+
+                    successful += 1
+
+                    log_event(
+                        employee=employee["Name"],
+                        status="SUCCESS",
+                        details=(
+                            "Employee created successfully"
+                        )
+                    )
+
+                    print(
+                        f"✓ SUCCESS: "
+                        f"{employee['Name']} processed"
+                    )
+
+                    human_pause(2)
+
+                # =================================================
+                # SYSTEM EXCEPTION
+                # =================================================
+
+                except Exception as error:
+
+                    system_exceptions += 1
+
+                    print(
+                        "❌ SYSTEM EXCEPTION"
+                    )
+
+                    print(
+                        f"Employee: {name}"
+                    )
+
+                    print(
+                        f"Error: {error}"
+                    )
+
+                    # Write system error to audit log
+                    log_event(
+                        employee=name,
+                        status="SYSTEM_EXCEPTION",
+                        details=str(error)
+                    )
+
+                    # Continue with next employee
+                    continue
+
+            # =================================================
+            # PROCESS SUMMARY
+            # =================================================
+
+            print("\n")
+
+            print("=" * 60)
+            print("RPA PROCESS SUMMARY")
+            print("=" * 60)
+
+            print(
+                f"Total records:       {len(employees)}"
+            )
+
+            print(
+                f"Successful:          {successful}"
+            )
+
+            print(
+                f"Business exceptions: {business_exceptions}"
+            )
+
+            print(
+                f"System exceptions:   {system_exceptions}"
+            )
+
+            print("=" * 60)
+
+            # Keep browser open so the user can inspect results
+            input(
+                "\nPress ENTER to close the browser..."
+            )
+
+        finally:
+
+            browser.close()
+
+
+# =========================================================
+# PROGRAM ENTRY POINT
+# =========================================================
 
 if __name__ == "__main__":
+
     run_bot()
